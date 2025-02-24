@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>표선초 반배정</title>
+    <title>반 배정 관리</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -69,23 +69,12 @@
         .student-name:hover {
             background-color: #ff4d4d;
         }
-        @media (max-width: 1024px) {
-            .container {
-                max-width: 90%;
-            }
-        }
-        @media (max-width: 600px) {
-            .container {
-                max-width: 100%;
-                padding: 10px;
-            }
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="card">
-            <h2>표선초 반배정</h2>
+            <h2>반 배정</h2>
             <label>학년</label>
             <select id="grade">
                 <option value="1">1학년</option>
@@ -105,63 +94,60 @@
             <input type="text" id="name" placeholder="이름 입력 (최대 4자)" maxlength="4">
             <button onclick="addStudent()">학생 추가</button>
         </div>
-
         <div class="card students-list">
             <h2>반별 학생 명단</h2>
             <div id="students"></div>
         </div>
     </div>
-
     <script>
-        let students = JSON.parse(localStorage.getItem("students")) || {};
+        async function fetchStudents() {
+            const response = await fetch("https://your-server.com/students");
+            const data = await response.json();
+            displayStudents(data);
+        }
 
-        function addStudent() {
+        async function addStudent() {
             const grade = document.getElementById("grade").value;
             const classNum = document.getElementById("classNum").value;
             const name = document.getElementById("name").value.trim();
             if (name.length === 0 || name.length > 4) return;
             
-            const key = `${grade}-${classNum}`;
-            if (!students[key]) students[key] = [];
-            students[key].push(name);
-            
-            localStorage.setItem("students", JSON.stringify(students));
-            document.getElementById("name").value = "";
-            displayStudents();
+            const response = await fetch("https://your-server.com/students", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ grade, classNum, name })
+            });
+            const data = await response.json();
+            displayStudents(data);
         }
 
-        function removeStudent(key, name) {
+        async function removeStudent(grade, classNum, name) {
             if (confirm(`${name}을(를) 삭제하시겠습니까?`)) {
-                students[key] = students[key].filter(student => student !== name);
-                localStorage.setItem("students", JSON.stringify(students));
-                displayStudents();
+                const response = await fetch("https://your-server.com/students", {
+                    method: "DELETE",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ grade, classNum, name })
+                });
+                const data = await response.json();
+                displayStudents(data);
             }
         }
 
-        function displayStudents() {
+        function displayStudents(students) {
             const studentsDiv = document.getElementById("students");
             studentsDiv.innerHTML = "";
-            
-            const groupedStudents = {};
-            for (const key in students) {
-                const [grade, classNum] = key.split("-");
-                if (!groupedStudents[grade]) groupedStudents[grade] = {};
-                groupedStudents[grade][classNum] = students[key];
-            }
-            
-            for (const grade in groupedStudents) {
+            for (const grade in students) {
                 const gradeDiv = document.createElement("div");
                 gradeDiv.className = "class-group";
                 gradeDiv.innerHTML = `<h3>${grade}학년</h3>`;
-                
-                for (const classNum in groupedStudents[grade]) {
+                for (const classNum in students[grade]) {
                     const classDiv = document.createElement("div");
                     classDiv.innerHTML = `<strong>${classNum}반:</strong> `;
-                    groupedStudents[grade][classNum].forEach(name => {
+                    students[grade][classNum].forEach(name => {
                         const nameSpan = document.createElement("span");
                         nameSpan.className = "student-name";
                         nameSpan.textContent = name;
-                        nameSpan.onclick = () => removeStudent(`${grade}-${classNum}`, name);
+                        nameSpan.onclick = () => removeStudent(grade, classNum, name);
                         classDiv.appendChild(nameSpan);
                     });
                     gradeDiv.appendChild(classDiv);
@@ -169,8 +155,8 @@
                 studentsDiv.appendChild(gradeDiv);
             }
         }
-        
-        window.onload = displayStudents;
+
+        window.onload = fetchStudents;
     </script>
 </body>
 </html>
