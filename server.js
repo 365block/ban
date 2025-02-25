@@ -1,39 +1,34 @@
-require("dotenv").config();
 const express = require("express");
-const mongoose = require("mongoose");
+const fs = require("fs-extra");
 const cors = require("cors");
+const path = require("path");
 
 const app = express();
+const PORT = process.env.PORT || 3000;
+const DATA_FILE = path.join(__dirname, "students.json");
+
 app.use(express.json());
 app.use(cors());
+app.use(express.static(__dirname)); // 📌 현재 폴더에서 정적 파일 제공
 
-// MongoDB 연결
-mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-}).then(() => console.log("MongoDB Connected"))
-.catch(err => console.error(err));
+// 데이터 로드
+const loadStudents = async () => {
+    try {
+        return await fs.readJson(DATA_FILE);
+    } catch (error) {
+        return {};
+    }
+};
 
-const StudentSchema = new mongoose.Schema({
-    grade: String,
-    classNum: String,
-    name: String
-});
-const Student = mongoose.model("Student", StudentSchema);
+// 데이터 저장
+const saveStudents = async (data) => {
+    await fs.writeJson(DATA_FILE, data, { spaces: 2 });
+};
 
 // 학생 목록 조회
 app.get("/students", async (req, res) => {
-    const students = await Student.find();
-    const formattedData = {};
-
-    students.forEach(student => {
-        const key = `${student.grade}-${student.classNum}`;
-        if (!formattedData[student.grade]) formattedData[student.grade] = {};
-        if (!formattedData[student.grade][student.classNum]) formattedData[student.grade][student.classNum] = [];
-        formattedData[student.grade][student.classNum].push(student.name);
-    });
-
-    res.json(formattedData);
+    const students = await loadStudents();
+    res.json(students);
 });
 
 // 학생 추가
@@ -42,17 +37,36 @@ app.post("/students", async (req, res) => {
     if (!grade || !classNum || !name) {
         return res.status(400).json({ error: "필수 입력 값이 없습니다." });
     }
-    await new Student({ grade, classNum, name }).save();
-    res.json(await Student.find());
+
+    const students = await loadStudents();
+    if (!students[grade]) students[grade] = {};
+    if (!students[grade][classNum]) students[grade][classNum] = [];
+
+    students[grade][classNum].push(name);
+    await saveStudents(students);
+    
+    res.json(students);
 });
 
 // 학생 삭제
 app.delete("/students", async (req, res) => {
     const { grade, classNum, name } = req.body;
-    await Student.findOneAndDelete({ grade, classNum, name });
-    res.json(await Student.find());
+
+    const students = await loadStudents();
+    if (students[grade] && students[grade][classNum]) {
+        students[grade][classNum] = students[grade][classNum].filter(student => student !== name);
+        if (students[grade][classNum].length === 0) delete students[grade][classNum];
+        if (Object.keys(students[grade]).length === 0) delete students[grade];
+    }
+
+    await saveStudents(students);
+    res.json(students);
+});
+
+// 📌 프론트엔드가 직접 접근할 수 있도록 index.html을 기본 페이지로 설정
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "index.html"));
 });
 
 // 서버 실행
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
