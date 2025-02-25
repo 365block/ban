@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>반 배정 관리</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background-color: #eef2f3;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            text-align: center;
+            width: 100%;
+        }
+        select, input, button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .students-list {
+            width: 100%;
+        }
+        .class-group {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .student-name {
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 4px;
+            display: inline-block;
+            margin: 3px;
+            background-color: #007bff;
+            color: white;
+        }
+        .student-name:hover {
+            background-color: #ff4d4d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h2>반 배정</h2>
+            <label>학년</label>
+            <select id="grade">
+                <option value="1">1학년</option>
+                <option value="2">2학년</option>
+                <option value="3">3학년</option>
+                <option value="4">4학년</option>
+                <option value="5">5학년</option>
+                <option value="6">6학년</option>
+            </select>
+            <label>반</label>
+            <select id="classNum">
+                <option value="1">1반</option>
+                <option value="2">2반</option>
+                <option value="3">3반</option>
+                <option value="4">4반</option>
+            </select>
+            <input type="text" id="name" placeholder="이름 입력 (최대 4자)" maxlength="4">
+            <button onclick="addStudent()">학생 추가</button>
+        </div>
+        <div class="card students-list">
+            <h2>반별 학생 명단</h2>
+            <div id="students"></div>
+        </div>
+    </div>
+    <script>
+        async function fetchStudents() {
+            const response = await fetch("/students");
+            const data = await response.json();
+            displayStudents(data);
+        }
+
+        async function addStudent() {
+            const grade = document.getElementById("grade").value;
+            const classNum = document.getElementById("classNum").value;
+            const name = document.getElementById("name").value.trim();
+            if (name.length === 0 || name.length > 4) return;
+            
+            const response = await fetch("/students", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ grade, classNum, name })
+            });
+            const data = await response.json();
+            displayStudents(data);
+        }
+
+        async function removeStudent(grade, classNum, name) {
+    if (confirm(`${name}을(를) 삭제하시겠습니까?`)) {
+        const response = await fetch("/students", {  // ✅ 절대 경로 제거하고 상대 경로 사용
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ grade, classNum, name })
+            });
+        const data = await response.json();
+        displayStudents(data);
+            }
+        }
+
+
+        function displayStudents(students) {
+            const studentsDiv = document.getElementById("students");
+            studentsDiv.innerHTML = "";
+            for (const grade in students) {
+                const gradeDiv = document.createElement("div");
+                gradeDiv.className = "class-group";
+                gradeDiv.innerHTML = `<h3>${grade}학년</h3>`;
+                for (const classNum in students[grade]) {
+                    const classDiv = document.createElement("div");
+                    classDiv.innerHTML = `<strong>${classNum}반:</strong> `;
+                    students[grade][classNum].forEach(name => {
+                        const nameSpan = document.createElement("span");
+                        nameSpan.className = "student-name";
+                        nameSpan.textContent = name;
+                        nameSpan.onclick = () => removeStudent(grade, classNum, name);
+                        classDiv.appendChild(nameSpan);
+                    });
+                    gradeDiv.appendChild(classDiv);
+                }
+                studentsDiv.appendChild(gradeDiv);
+            }
+        }
+
+        window.onload = fetchStudents;
+    </script>
+</body>
+</html>
